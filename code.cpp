@@ -11,8 +11,6 @@ double Kp=1, Ki=0, Kd=0;
 PID rfPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 */
 
-
-//PID constants
 double kp = 0.00400;
 double ki = 0.00400;
 double kd = 0.00010;
