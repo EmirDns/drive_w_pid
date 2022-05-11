@@ -4,25 +4,57 @@
 #include "ros.h"
 #include "std_msgs/Float64.h"
 
-/*
-#include "PID_v1.h"
-double Input, Output, Setpoint;
-double Kp=1, Ki=0, Kd=0;
-PID rfPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
-*/
 
-double kp = 0.00400;
-double ki = 0.00400;
-double kd = 0.00010;
+double lf_kp = 0.05000;
+double lf_ki = 0.00400;
+double lf_kd = 0.00010;
+unsigned long lf_currentTime, lf_previousTime;
+double lf_elapsedTime;
+double lf_error;
+double lf_lastError;
+double lf_input, lf_output, lf_Setpoint;
+double lf_cumError, lf_rateError;
+double lf_computePID(double lf_inp);
 
-unsigned long currentTime, previousTime;
-double elapsedTime;
-double error;
-double lastError;
-double input, output, Setpoint;
-double cumError, rateError;
 
-double computePID(double inp);
+double lb_kp = 0.05000;
+double lb_ki = 0.00400;
+double lb_kd = 0.00010;
+unsigned long lb_currentTime, lb_previousTime;
+double lb_elapsedTime;
+double lb_error;
+double lb_lastError;
+double lb_input, lb_output, lb_Setpoint;
+double lb_cumError, lb_rateError;
+double lb_computePID(double lb_inp);
+
+
+double rb_kp = 0.05000;
+double rb_ki = 0.00400;
+double rb_kd = 0.00010;
+unsigned long rb_currentTime, rb_previousTime;
+double rb_elapsedTime;
+double rb_error;
+double rb_lastError;
+double rb_input, rb_output, rb_Setpoint;
+double rb_cumError, rb_rateError;
+double rb_computePID(double rb_inp);
+
+
+double rf_kp = 0.05000;
+double rf_ki = 0.00400;
+double rf_kd = 0.00010;
+unsigned long rf_currentTime, rf_previousTime;
+double rf_elapsedTime;
+double rf_error;
+double rf_lastError;
+double rf_input, rf_output, rf_Setpoint;
+double rf_cumError, rf_rateError;
+double rf_computePID(double rf_inp);
+
+
+
+
 
 
 #define ARRAY_LEN 4
@@ -65,9 +97,6 @@ int unmapRpm(void);
 void createFeedbackMsg(int a, int b, int c, int d);
 
 void setup() {
-  
-  
-
   RBSerial.begin(115200);
   RFSerial.begin(115200);
   LBSerial.begin(115200);
@@ -88,56 +117,54 @@ void setup() {
   while(!LFSerial){;}
   LFmotor.setSerialPort(&LFSerial);
 
-  
   RBmotor.setRPM(0);
   RFmotor.setRPM(0);
   LBmotor.setRPM(0);
   LFmotor.setRPM(0);
-
-  //rfPID.SetMode(AUTOMATIC);
-  
 }
 
 void loop() {
-  
-  
+
   readNdrive();
   
     if(!torque_mode_flag){
       
-      /*
-      Input=RFmotor.data.rpm;
-      Setpoint=mapped_rpm_command_array[2];
-      rfPID.Compute();
-      */
-      
-      
-      /*
+      lf_input = LFmotor.data.dutyCycleNow;            
+      lf_Setpoint=mapped_rpm_command_array[0];
+      lf_output = lf_computePID(lf_input);
+
+      lb_input = LBmotor.data.dutyCycleNow;            
+      lb_Setpoint=mapped_rpm_command_array[0];
+      lb_output = lb_computePID(lb_input);
+
+      rb_input = RBmotor.data.dutyCycleNow;            
+      rb_Setpoint=mapped_rpm_command_array[2];
+      rb_output = rb_computePID(rb_input);
+
+      rf_input = RFmotor.data.dutyCycleNow;            
+      rf_Setpoint=mapped_rpm_command_array[2];
+      rf_output = rf_computePID(rf_input);
+
+  
+
       LFmotor.setDuty(mapped_rpm_command_array[0]);
       LBmotor.setDuty(mapped_rpm_command_array[0]);
-      */
+      RBmotor.setDuty(mapped_rpm_command_array[2]);
+      RFmotor.setDuty(mapped_rpm_command_array[2]);
       
-      input = RFmotor.data.rpm;                //read from rotary encoder connected to A0
-      Setpoint=mapped_rpm_command_array[2];
-      output = computePID(input);
-      delay(2);
-      
-      RBmotor.setRPM(output);
-      RFmotor.setRPM(output);
-      
-      
-      /*
-      RBmotor.setRPM(mapped_rpm_command_array[2]);
-      RFmotor.setRPM(mapped_rpm_command_array[2]);
-      */
+
+
+    
     }
     
     if(torque_mode_flag){
       LFmotor.setCurrent(mapped_current_command_array[0]);
-      LBmotor.setCurrent(mapped_current_command_array[0]);
+      LBmotor.setCurrent(mapped_current_command_array[1]);
       RBmotor.setCurrent(mapped_current_command_array[2]);
-      RFmotor.setCurrent(mapped_current_command_array[2]);
+      RFmotor.setCurrent(mapped_current_command_array[3]);
     }
+    
+  //delayMicroseconds(2000);
 }
 
 void readNdrive(void){
@@ -168,15 +195,12 @@ void readNdrive(void){
 
       mapData();
       mapCurrent();
+    
 
-      
-
-
-     if(RBmotor.getVescValues() && RFmotor.getVescValues()){
-        createFeedbackMsg(int(500), int(500), int(RBmotor.data.rpm), int(RFmotor.data.rpm));     
-        //motherBoardSerial.println('A'+String(LFmotor.data.rpm)+'B'+String(LBmotor.data.rpm)+'C');
+     if(LFmotor.getVescValues() && LBmotor.getVescValues() && RBmotor.getVescValues() && RFmotor.getVescValues()){
+        createFeedbackMsg(int(LFmotor.data.rpm), int(LBmotor.data.rpm), int(RBmotor.data.rpm), int(RFmotor.data.rpm));     
       }
-
+      
       receive_flag=false;
       rpmString="";
     }
@@ -224,27 +248,27 @@ void assignCurrentArray(String currentStr){
 }
 
 void mapData(void){
-  
-  for(int i=0;i<ARRAY_LEN;i++){
-    if(unmapped_rpm_command_array[i]<=0){
-      mapped_rpm_command_array[i]=((unmapped_rpm_command_array[i]+999)*10000/999)-10000;
-    }
-    if(unmapped_rpm_command_array[i]>0){
-      mapped_rpm_command_array[i]=unmapped_rpm_command_array[i]*10000/999;
-    }
-  }
-  
-  
   /*
   for(int i=0;i<ARRAY_LEN;i++){
     if(unmapped_rpm_command_array[i]<=0){
-      mapped_rpm_command_array[i]=((unmapped_rpm_command_array[i]+999)*1/999)-1;
+      mapped_rpm_command_array[i]=(((unmapped_rpm_command_array[i]+999)*8400/999)-8400);
     }
     if(unmapped_rpm_command_array[i]>0){
-      mapped_rpm_command_array[i]=unmapped_rpm_command_array[i]*1/999;
+      mapped_rpm_command_array[i]=(unmapped_rpm_command_array[i]*8400/999);
     }
   }
   */
+  
+  
+  for(int i=0;i<ARRAY_LEN;i++){
+    if(unmapped_rpm_command_array[i]<=0){
+      mapped_rpm_command_array[i]=((unmapped_rpm_command_array[i]+999)*0.70/999)-0.70;
+    }
+    if(unmapped_rpm_command_array[i]>0){
+      mapped_rpm_command_array[i]=unmapped_rpm_command_array[i]*0.70/999;
+    }
+  }
+  
 }
 
 void mapCurrent(void){
@@ -272,13 +296,10 @@ char getDir(int x){
 int unmapRpm(int x){
   int unmapped_data;
   if(x>0){
-    unmapped_data=x*999/10500;
+    unmapped_data=x*999/10000;
   }
   if(x<=0){
-    unmapped_data=((x+10500)*999/10500)-999;
-  }
-  if(unmapped_data>999){
-    unmapped_data=999;
+    unmapped_data=((x+10000)*999/10000)-999;
   }
   return unmapped_data;
 }
@@ -318,18 +339,68 @@ void createFeedbackMsg(int a, int b, int c, int d){
   motherBoardSerial.println(sentString);
 }
 
-double computePID(double inp){     
-        currentTime = millis();               
-        elapsedTime = (double)(currentTime - previousTime);       
+double lf_computePID(double lf_inp){     
+        lf_currentTime = millis();               
+        lf_elapsedTime = (double)(lf_currentTime - lf_previousTime);       
         
-        error = Setpoint - inp;                                
-        cumError += error * elapsedTime;               
-        rateError = (error - lastError)/elapsedTime;   
+        lf_error = lf_Setpoint - lf_inp;                                
+        lf_cumError += lf_error * lf_elapsedTime;               
+        lf_rateError = (lf_error - lf_lastError)/lf_elapsedTime;   
 
-        double out = kp*error + ki*cumError + kd*rateError;                             
+        double lf_out = lf_kp*lf_error + lf_ki*lf_cumError + lf_kd*lf_rateError;                             
 
-        lastError = error;                                
-        previousTime = currentTime;                        
+        lf_lastError = lf_error;                                
+        lf_previousTime = lf_currentTime;                        
 
-        return out;                                        
+        return lf_out;                                        
 }
+
+double lb_computePID(double lb_inp){     
+        lb_currentTime = millis();               
+        lb_elapsedTime = (double)(lb_currentTime - lb_previousTime);       
+        
+        lb_error = lb_Setpoint - lb_inp;                                
+        lb_cumError += lb_error * lb_elapsedTime;               
+        lb_rateError = (lb_error - lb_lastError)/lb_elapsedTime;   
+
+        double lb_out = lb_kp*lb_error + lb_ki*lb_cumError + lb_kd*lb_rateError;                             
+
+        lb_lastError = lb_error;                                
+        lb_previousTime = lb_currentTime;                        
+
+        return lb_out;                                        
+}
+
+double rb_computePID(double rb_inp){     
+        rb_currentTime = millis();               
+        rb_elapsedTime = (double)(rb_currentTime - rb_previousTime);       
+        
+        rb_error = rb_Setpoint - rb_inp;                                
+        rb_cumError += rb_error * rb_elapsedTime;               
+        rb_rateError = (rb_error - rb_lastError)/rb_elapsedTime;   
+
+        double rb_out = rb_kp*rb_error + rb_ki*rb_cumError + rb_kd*rb_rateError;                             
+
+        rb_lastError = rb_error;                                
+        rb_previousTime = rb_currentTime;                        
+
+        return rb_out;                                        
+}
+
+double rf_computePID(double rf_inp){     
+        rf_currentTime = millis();               
+        rf_elapsedTime = (double)(rf_currentTime - rf_previousTime);       
+        
+        rf_error = rf_Setpoint - rf_inp;                                
+        rf_cumError += rf_error * rf_elapsedTime;               
+        rf_rateError = (rf_error - rf_lastError)/rf_elapsedTime;   
+
+        double rf_out = rf_kp*rf_error + rf_ki*rf_cumError + rf_kd*rf_rateError;                             
+
+        rf_lastError = rf_error;                                
+        rf_previousTime = rf_currentTime;                        
+
+        return rf_out;                                        
+}
+
+
